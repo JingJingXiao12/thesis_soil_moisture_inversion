@@ -1,0 +1,209 @@
+import time
+
+import numpy as np
+import pandas as pd
+import lightgbm as lgb
+from sklearn.model_selection import StratifiedKFold, GridSearchCV
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score,mean_squared_error
+from sklearn.model_selection import KFold
+import pickle
+import math
+import os
+def get_train_val(train_data):
+    y = train_data['Soil Moisture'].tolist()
+    col = train_data.columns.drop(["OBJECTID", "ID" , 'Latitude' , 'Longitude' , 'Latitude_D' , 'Longitude_'  , 'Soil Moisture'])
+    x = train_data[col].values  # 剩下的列作为训练数据
+    assert len(x) == len(y)
+    return x , y
+
+def lgbm_train(train,valid):
+    parameters = {
+                'bagging_fraction' : [0.6],
+                'bagging_freq': [5],
+                'cat_smooth': [1],
+                'feature_fraction': [0.95],
+                'lambda_l1': [1e-5,1e-3,1e-1,0.0,0.1],
+                'lambda_l2': [1e-5,1e-3,1e-1,0.0,0.1],
+                'learning_rate': [0.02,0.01,1e-2,1e-3],
+                'num_leaves': [15,10,5],
+                'subsample': [0.6, 0.7, 0.8, 1.0],
+                'colsample_bytree': [0.6, 0.7, 0.8, 1.0],
+                "max_depth" : [30,40,50,60,70,80,90],
+            }
+    gbm = lgb.LGBMRegressor(
+    boosting_type='gbdt',
+    num_leaves=30,
+    learning_rate=0.1,
+    n_estimators=10,
+    max_bin=255,
+    subsample_for_bin=500,
+    objective='regression',
+    min_split_gain=0,
+    min_child_weight=5,
+    min_child_samples=10,
+    subsample=1,
+    subsample_freq=1,
+    colsample_bytree=1,
+    reg_alpha=0,
+    reg_lambda=0,
+    seed=0,
+    silent=True,
+    huber_delta=1.0,
+    fair_c=1.0,
+    poisson_max_delta_step=0.7,
+    drop_rate=0.1,
+    skip_drop=0.5,
+    max_drop=50,
+    uniform_drop=False,
+    xgboost_dart_mode=False,
+    verbose_eval=100
+)
+#有了gridsearch我们便不需要fit函数
+    gsearch = GridSearchCV(gbm, param_grid=parameters,  cv=3 , verbose = 1 , n_jobs  = -1 ,scoring = 'r2')
+    gsearch.fit(train, valid)
+
+    #print("Best score: %0.3f" % gsearch.best_score_)
+    #print("Best parameters set:")
+    best_parameters = gsearch.best_estimator_.get_params()
+    #for param_name in sorted(parameters.keys()):
+    #    print("\t%s: %r" % (param_name, best_parameters[param_name]))
+
+
+def Kfold_cv(k, X, y, show, V, pol , random_seed = 707):
+    kf = KFold(n_splits=k, shuffle=True, random_state= random_seed)
+    rmse = []
+    r2 = []
+    oof = np.zeros(len(y))
+    fold = 0
+    for train_index, test_index in kf.split(X):
+        fold += 1
+        train_x = X[train_index]
+        train_y = y[train_index]
+        test_x = X[test_index]
+        test_y = y[test_index]
+
+        model = lgb.LGBMRegressor(
+            boosting_type='gbdt',
+            num_leaves=7,
+            max_depth=39,
+            learning_rate=0.1,
+            n_estimators=100,
+            max_bin=255,
+            subsample_for_bin=5000,
+            objective='regression',
+            min_split_gain=0,
+            min_child_weight=5,
+            min_child_samples=10,
+            subsample=1,
+            subsample_freq=1,
+            colsample_bytree=1,
+            reg_alpha=0,
+            reg_lambda=0,
+            seed=0,
+            fair_c=1.0,
+            poisson_max_delta_step=0.1,
+            drop_rate=0.1,
+            skip_drop=0.5,
+            max_drop=50,
+            uniform_drop=False,
+            xgboost_dart_mode=False,
+        )
+        model.fit(train_x, train_y)
+        predict = model.predict(test_x)
+        cnt = 0
+        for item in test_index:
+            oof[item] = predict[cnt]
+            cnt += 1
+
+        testing_r2 = r2_score(test_y, predict)
+        testing_rmse = np.sqrt(mean_squared_error(predict, test_y))
+        if show == True:
+            print("-" * 10, "fold_{}".format(fold))
+            print("testing r2:", testing_r2)
+            print("testing rmse:", testing_rmse)
+        rmse.append(testing_rmse)
+        r2.append(testing_r2)
+
+
+        if os.path.exists('save') == False:
+            os.mkdir('./save')
+        if os.path.exists('save/lgbm_checkpoint') == False:
+            os.mkdir('./save/lgbm_checkpoint')
+
+        with open('save/lgbm_checkpoint/lgbm_result{}_{}_{}.pickle'.format(fold, V, pol), 'wb') as f:
+            pickle.dump(model, f)
+
+    if show == True:
+        print("rmse cv result {}±{}".format(np.mean(rmse), np.std(rmse)))
+        print("r2 cv result {}±{}".format(np.mean(r2), np.std(r2)))
+
+    return np.mean(rmse), np.std(rmse), np.mean(r2), np.std(r2)
+
+
+def get_factors(df, VI_label, polar):
+    Pi = math.acos(-1)
+    X = []
+    for index, row in df.iterrows():
+        VI = row[VI_label]
+        sigma0 = row[polar]
+        sec_theta = 1 / math.cos(row['incident angle'] * Pi / 180)
+
+        factors = [sigma0, VI, VI * VI, VI * VI * VI, VI * VI * VI * VI,
+                   sigma0 * sec_theta, sigma0 * VI * sec_theta, sigma0 * VI * VI * sec_theta]
+
+        assert len(factors) == 8
+        X.append(factors)
+    return X
+
+def pred(paras , x):
+    ret = []
+    for row in x:
+        ret.append( np.dot(row , paras[1:]) + paras[0])
+    return ret
+
+def solve():
+    df_paras = pd.read_csv("stat_linear_regression.csv")
+    df = pd.read_excel("newpointdata.xlsx")
+
+    list_rmse_mean = []
+    list_rmse_std = []
+    list_r2_mean = []
+    list_r2_std = []
+
+    for i, row in df_paras.iterrows():
+        paras = []
+        for j in range(1, 10):
+            name = 'k{}'.format(j)
+            paras.append(row[name])
+
+        factors_X = get_factors(df, row['VI'], row['polarization'])
+        linear_pred = pred(paras, factors_X)
+
+        df['oof'] = linear_pred
+        x, y = get_train_val(df)
+
+        x = np.array(x)
+        y = np.array(y)
+        rmse_mean, rmse_std, r2_mean, r2_std = Kfold_cv(5, x, y, False, row['VI'], row['polarization'])
+        list_rmse_mean.append(rmse_mean)
+        list_rmse_std.append(rmse_std)
+        list_r2_mean.append(r2_mean)
+        list_r2_std.append(r2_std)
+    df_paras['lgbm_rmse_mean'] = list_rmse_mean
+    df_paras['lgbm_rmse_std'] = list_rmse_std
+    df_paras['lgbm_r2_mean'] = list_r2_mean
+    df_paras['lgbm_r2_std'] = list_r2_std
+
+    if os.path.exists('lgbm_model_result') == False:
+        os.mkdir('lgbm_model_result')
+
+    local_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
+    saving_filename = local_time + "_lgbm_cvresult.csv"
+
+    print(df_paras)
+    df_paras.to_csv("stat_lgbm.csv")
+    df_paras.to_csv("./lgbm_model_result/" + saving_filename)
+    print(df_paras[['rmse-mean', 'lgbm_rmse_mean']])
+if __name__ == '__main__':
+    solve()
