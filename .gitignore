@@ -1,7 +1,7 @@
-data/
-lgbm_model_result/
-linear_model_result/
-save/
+/data/*
+/lgbm_model_result/*
+/linear_model_result/*
+/save/*
 newpointdata.xlsx
 stat_lgbm.csv
 stat_linear_regression.csv
