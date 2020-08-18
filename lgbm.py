@@ -10,7 +10,14 @@ from sklearn.model_selection import KFold
 import pickle
 import math
 import os
+
+
 def get_train_val(train_data):
+    '''
+    将训练数据格式化为一个特征向量x和结果y
+    :param train_data:
+    :return: 特征向量x，结果y
+    '''
     y = train_data['Soil Moisture'].tolist()
     col = train_data.columns.drop(["OBJECTID", "ID" , 'Latitude' , 'Longitude' , 'Latitude_D' , 'Longitude_'  , 'Soil Moisture'])
     x = train_data[col].values  # 剩下的列作为训练数据
@@ -18,6 +25,12 @@ def get_train_val(train_data):
     return x , y
 
 def lgbm_train(train,valid):
+    '''
+    用gridsearch搜索lgbm的最好参数
+    :param train:
+    :param valid:
+    :return:
+    '''
     parameters = {
                 'bagging_fraction' : [0.6],
                 'bagging_freq': [5],
@@ -71,6 +84,17 @@ def lgbm_train(train,valid):
 
 
 def Kfold_cv(k, X, y, show, V, pol , random_seed = 707):
+    '''
+
+    :param k: 分成几个ford
+    :param X: 训练特征向量
+    :param y: 结果（土壤含水量）
+    :param show: 是否显示结果
+    :param V: 使用哪种VI，
+    :param pol: 使用哪种极化方式
+    :param random_seed: 随机种子
+    :return: kford验证的rmse的均值，方差，kford验证的r方的均值，方差
+    '''
     kf = KFold(n_splits=k, shuffle=True, random_state= random_seed)
     rmse = []
     r2 = []
@@ -142,6 +166,13 @@ def Kfold_cv(k, X, y, show, V, pol , random_seed = 707):
 
 
 def get_factors(df, VI_label, polar):
+    '''
+    获取水云模型的参数
+    :param df:
+    :param VI_label: 使用哪种VI，目前使用有['EVI', 'PVI', 'RVI', 'SAVI', 'NDWI', 'NDVI']
+    :param polar: 使用哪种极化方式，有VV和VH两种
+    :return: 水云模型的参数
+    '''
     Pi = math.acos(-1)
     X = []
     for index, row in df.iterrows():
@@ -157,12 +188,22 @@ def get_factors(df, VI_label, polar):
     return X
 
 def pred(paras , x):
+    '''
+    使用计算好的水云模型得到预测的结果
+    :param paras: 水云模型的参数
+    :param x: 需要预测的特征向量
+    :return: 水云模型的预测含水量
+    '''
     ret = []
     for row in x:
         ret.append( np.dot(row , paras[1:]) + paras[0])
     return ret
 
 def solve():
+    '''
+    pipeline
+    :return:
+    '''
     df_paras = pd.read_csv("stat_linear_regression.csv")
     df = pd.read_excel("newpointdata.xlsx")
 

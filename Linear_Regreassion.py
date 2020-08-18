@@ -7,7 +7,17 @@ from sklearn.linear_model import Ridge,LinearRegression
 from sklearn.metrics import r2_score,mean_squared_error
 import time
 import os
+
+
 def get_factors(df, VI_label, polar):
+
+    '''
+    :param df: 训练数据集
+    :param VI_label:  属于VH极化还是VV极化
+    :param polar:  VH或者VV极化的值
+    :return: 水云模型经过泰勒展开后的8个因子
+    '''
+
     Pi = math.acos(-1)
 
     X = []
@@ -35,12 +45,20 @@ def Ridge_regression(X, y):
 
     岭回归主要解决的问题是两种：一是当预测变量的数量超过观测变量的数量的时候（预测变量相当于特征，观测变量相当于标签），
                         二是数据集之间具有多重共线性，即预测变量之间具有相关性。
+
+    相比于线性回归，岭回归的模型在均方根误差中还加入一项所有参数的平方和来减小所有参数
+    :param X: 水云模型经过泰勒展开后的8个因子
+    :param y: 土壤含水量
+    :return: 训练好的Ridge regression模型
     '''
+
     model = Ridge(alpha=0.05)
     model.fit(X, y)
+
+    # 这部分代码用来显示岭回归的准确度
     # print('coefs:\n',model.coef_)
     # print('intercept' , model.intercept_)
-    predicted = model.predict(X)
+    # predicted = model.predict(X)
 
     # print("training r2:" , r2_score(y , predicted))
     # print("training rmse:", np.sqrt(mean_squared_error(predicted,y)) )
@@ -50,6 +68,11 @@ def Ridge_regression(X, y):
 
 
 def linear_regression(X, y):
+    '''
+    :param X: 水云模型经过泰勒展开后的8个因子
+    :param y: 土壤含水量
+    :return: 训练好的linear_regression模型
+    '''
     model = LinearRegression()
     model.fit(X, y)
     print('coefs:\n', model.coef_)
@@ -62,6 +85,15 @@ def linear_regression(X, y):
 
 
 def Kfold_cv(k, X, y, random_seed=515, save=True):
+    '''
+
+    :param k: kford中分成几个fold
+    :param X: 水云模型经过泰勒展开后的8个因子
+    :param y: 土壤含水量
+    :param random_seed: kford分割的随机种子
+    :param save: 是否保存结果，默认为保存
+    :return: kford的oof，kford验证的rmse的均值，方差，kford验证的r方的均值，方差
+    '''
     kf = KFold(n_splits=k, shuffle=True, random_state=random_seed)
 
     rmse = []
@@ -109,6 +141,14 @@ def Kfold_cv(k, X, y, random_seed=515, save=True):
 
 
 def cross_validation(df , VIS, POL, random_seed = 515):
+    '''
+
+    :param df: 采集好的训练数据
+    :param VIS: 使用哪种VI进行训练，如['EVI', 'PVI', 'RVI', 'SAVI', 'NDWI', 'NDVI']
+    :param POL: 使用哪种极化后的数据进行训练，选项有vh极化和vv极化
+    :param random_seed: kford分割的随机种子
+    :return:
+    '''
     VIs = []
     POLs = []
     PARAs = []
@@ -145,6 +185,10 @@ def cross_validation(df , VIS, POL, random_seed = 515):
     return cv_result
 
 def solve():
+    '''
+    pipeline
+    :return:
+    '''
     df = pd.read_excel("./newpointdata.xlsx")
     print((df.head(2)))
     VIS = ['EVI', 'PVI', 'RVI', 'SAVI', 'NDWI', 'NDVI']

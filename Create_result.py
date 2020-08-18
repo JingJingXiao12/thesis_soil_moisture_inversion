@@ -8,7 +8,12 @@ import math
 from PIL import Image
 
 
+
 def load_tif_files():
+    '''
+    读取tif图片
+    :return:
+    '''
     root = "./data/clipnewdata/"
     pics = []
     names = []
@@ -30,6 +35,16 @@ def load_tif_files():
     return n , m , mp
 
 def linear_model_predict(VI, VV, paras, n , m , mp):
+    '''
+    使用已经计算好的线性模型预测整张图的结果
+    :param VI: 使用哪种VI
+    :param VV: 使用哪种极化方式
+    :param paras: 水云模型的参数
+    :param n: 图片的横坐标大小
+    :param m: 图片的纵坐标大小
+    :param mp: 读入的tif图片
+    :return: 用水云模型预测的土壤含水量
+    '''
     Pi = math.acos(-1)
     result = np.zeros((n, n))
     pic_VI = mp[VI]
@@ -51,7 +66,14 @@ def linear_model_predict(VI, VV, paras, n , m , mp):
 
 
 def get_linear_model_result( n , m , mp , df_paras):
-
+    '''
+    批量生成水云模型的土壤含水量结果
+    :param n: 图片的横坐标大小
+    :param m: 图片的纵坐标大小
+    :param mp: 读入的tif图片
+    :param df_paras: 水云模型的参数
+    :return: 生成的土壤含水量的一些统计结果，土壤含水量图
+    '''
     stat_min = []
     stat_max = []
     stat_mean = []
@@ -89,6 +111,16 @@ def get_linear_model_result( n , m , mp , df_paras):
 
 
 def predict_lgbm( n , m , mp , r, V, pol):
+    '''
+    使用梯度提升树得到的土壤含水量预测结果
+    :param n: 图片的横坐标大小
+    :param m: 图片的纵坐标大小
+    :param mp: 读入的tif图片
+    :param r: 水云模型的计算结果
+    :param V: 使用哪种VI
+    :param pol: 使用哪种极化方式
+    :return: lgbm预测的土壤含水量图
+    '''
     cols = ['incidentangle', 'sigma0vh', 'sigma0vv', 'DEM', 'Solar Radiation',
             'Sunshine Duration', 'Surface Roughness',
             'Relief Degree of Land Surface', 'Temperature', 'NDVI', 'RVI', 'EVI',
@@ -116,6 +148,15 @@ def predict_lgbm( n , m , mp , r, V, pol):
     return all_result
 
 def get_lgbm_result(n , m , mp , df_paras , oof_results):
+    '''
+    批量生成梯度提升树的结果
+    :param n: 图片的横坐标大小
+    :param m: 图片的纵坐标大小
+    :param mp: 读入的tif图片
+    :param df_paras: 水云模型的参数
+    :param oof_results: 水云模型结果图
+    :return:
+    '''
     for i, row in df_paras.iterrows():
         VI = row['VI']
         pol = row['polarization']
