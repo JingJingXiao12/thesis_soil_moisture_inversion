@@ -83,7 +83,7 @@ def lgbm_train(train,valid):
     #    print("\t%s: %r" % (param_name, best_parameters[param_name]))
 
 
-def Kfold_cv(k, X, y, show, V, pol , random_seed = 707):
+def Kfold_cv(k, X, y, show, V, pol , random_seed = 0):
     '''
 
     :param k: 分成几个ford
@@ -226,7 +226,7 @@ def solve():
 
         x = np.array(x)
         y = np.array(y)
-        rmse_mean, rmse_std, r2_mean, r2_std = Kfold_cv(5, x, y, False, row['VI'], row['polarization'])
+        rmse_mean, rmse_std, r2_mean, r2_std = Kfold_cv(5, x, y, False, row['VI'], row['polarization'] , 0)
         list_rmse_mean.append(rmse_mean)
         list_rmse_std.append(rmse_std)
         list_r2_mean.append(r2_mean)

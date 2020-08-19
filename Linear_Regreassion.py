@@ -84,7 +84,7 @@ def linear_regression(X, y):
     return model
 
 
-def Kfold_cv(k, X, y, random_seed=515, save=True):
+def Kfold_cv(k, X, y, random_seed=781, save=True):
     '''
 
     :param k: kford中分成几个fold
@@ -140,7 +140,7 @@ def Kfold_cv(k, X, y, random_seed=515, save=True):
     return oof, paras / 5, np.mean(rmse), np.std(rmse), np.mean(r2), np.std(r2)
 
 
-def cross_validation(df , VIS, POL, random_seed = 515):
+def cross_validation(df , VIS, POL, random_seed = 781):
     '''
 
     :param df: 采集好的训练数据
